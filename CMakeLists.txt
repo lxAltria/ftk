@@ -345,6 +345,7 @@ if (FTK_BUILD_PYFTK)
 endif ()
 
 add_subdirectory (src)
+add_subdirectory (examples)
 
 if (FTK_BUILD_PARAVIEW)
   add_subdirectory (paraview)
