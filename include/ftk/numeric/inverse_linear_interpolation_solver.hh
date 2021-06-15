@@ -48,9 +48,12 @@ inline bool inverse_lerp_s2v2(const T V[3][2], T mu[3],
   solve_linear2x2(A, b, mu);
   mu[2] = T(1) - mu[0] - mu[1];
 
-  return mu[0] >= -epsilon && mu[0] <= T(1) + epsilon &&
-    mu[1] >= -epsilon && mu[1] <= T(1) + epsilon &&
-    mu[2] >= -epsilon && mu[2] <= T(1) + epsilon;
+  // return mu[0] >= -epsilon && mu[0] <= T(1) + epsilon &&
+  //   mu[1] >= -epsilon && mu[1] <= T(1) + epsilon &&
+  //   mu[2] >= -epsilon && mu[2] <= T(1) + epsilon;
+  return mu[0] >= 0 && mu[0] < T(1) &&
+    mu[1] >= 0 && mu[1] < T(1) &&
+    mu[2] >= 0 && mu[2] < T(1);
 }
 
 template <typename T>
@@ -114,10 +117,14 @@ inline bool inverse_lerp_s3v3(const T V[4][3], T lambda[4],
   solve_linear3x3(A, b, lambda);
   lambda[3] = T(1) - lambda[0] - lambda[1] - lambda[2];
   
-  return lambda[0] >= -epsilon && lambda[0] < T(1) + epsilon && 
-         lambda[1] >= -epsilon && lambda[1] < T(1) + epsilon && 
-         lambda[2] >= -epsilon && lambda[2] < T(1) + epsilon && 
-         lambda[3] >= -epsilon && lambda[3] < T(1) + epsilon;
+  // return lambda[0] >= -epsilon && lambda[0] < T(1) + epsilon && 
+  //        lambda[1] >= -epsilon && lambda[1] < T(1) + epsilon && 
+  //        lambda[2] >= -epsilon && lambda[2] < T(1) + epsilon && 
+  //        lambda[3] >= -epsilon && lambda[3] < T(1) + epsilon;
+  return lambda[0] >= 0 && lambda[0] < T(1) && 
+         lambda[1] >= 0 && lambda[1] < T(1) && 
+         lambda[2] >= 0 && lambda[2] < T(1) && 
+         lambda[3] >= 0 && lambda[3] < T(1);
 }
 
 }

@@ -57,7 +57,7 @@ int inverse_bilinear_interpolation(const T u[4], const T v[4], T pos[2][2])
   T xx, yy;
   int nroots = 0;
   for (int i=0; i<2; i++) // check the two roots 
-    if (x[i]>=0 && x[i]<=1 && y[i]>=0 && y[i]<=1) {
+    if (x[i]>=0 && x[i]<1 && y[i]>=0 && y[i]<1) {
       pos[nroots][0] = x[i];
       pos[nroots][1] = y[i];
       nroots ++;
