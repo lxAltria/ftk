@@ -277,7 +277,6 @@ int main(int argc, char **argv){
   cp_file ? printf("Critical point file found!\n") : printf("Critical point Not found, recomputing\n");
   auto critical_points_0 = cp_file ? read_criticalpoints("origin_M") : get_critical_points();
   std::cout << "critical_points number = " << critical_points_0.size() << std::endl;
-  return 0;
   {
     std::cout << "read decompressed data\n";
     std::string fn_u = std::string(argv[3]) + ".out";
