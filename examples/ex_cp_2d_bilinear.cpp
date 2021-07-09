@@ -78,24 +78,90 @@ std::string get_critical_point_type_string(int type){
   }
 }
 
+int bilinear_critical_point_type(double u[4], double v[4], double x[2]){
+  double  f00 = u[0], f10 = u[1], f01 = u[3], f11 = u[2], 
+          g00 = v[0], g10 = v[1], g01 = v[3], g11 = v[2];
+  double  A0 = f00 - f10 - f01 + f11,  // Axy + Bx + Cy + D = 0
+          B0 = f10 - f00, 
+          C0 = f01 - f00, 
+          D0 = f00,
+          A1 = g00 - g10 - g01 + g11, 
+          B1 = g10 - g00, 
+          C1 = g01 - g00, 
+          D1 = g00; 
+  double J[2][2] = {{A0 * x[1] + B0, A0 * x[0] + C0}, {A1 * x[1] + B1, A1*x[0] + C1}}; // jacobian  
+  // if(fabs(A0*x[0]*x[1] + B0*x[0] + C0*x[1] + D0) > 1e-6){
+  //   std::cout << A0*x[0]*x[1] + B0*x[0] + C0*x[1] + D0 << std::endl;
+  //   exit(0);
+  // }
+  // if(fabs(A1*x[0]*x[1] + B1*x[0] + C1*x[1] + D1) > 1e-6){
+  //   std::cout << A1*x[0]*x[1] + B1*x[0] + C1*x[1] + D1 << std::endl;
+  //   exit(0);
+  // }
+  int cp_type = 0;
+  std::complex<double> eig[2];
+  double delta = ftk::solve_eigenvalues2x2(J, eig);
+  // if(fabs(delta) < std::numeric_limits<double>::epsilon())
+  if (delta >= 0) { // two real roots
+    if (eig[0].real() * eig[1].real() < 0) {
+      cp_type = SADDLE;
+    } else if (eig[0].real() < 0) {
+      cp_type = ATTRACTING;
+    }
+    else if (eig[0].real() > 0){
+      cp_type = REPELLING;
+    }
+    else cp_type = SINGULAR;
+  } else { // two conjugate roots
+    if (eig[0].real() < 0) {
+      cp_type = ATTRACTING_FOCUS;
+    } else if (eig[0].real() > 0) {
+      cp_type = REPELLING_FOCUS;
+    } else 
+      cp_type = CENTER;
+  }
+  return cp_type;
+}
+
 void extract_critical_points()
 {
   fprintf(stderr, "extracting critical points...\n");
-
+  int id = 0;
   for (int j = 1; j < DH-2; j ++) // avoiding borders..
     for (int i = 1; i < DW-2; i ++) {
       double u[4] = {grad(0, i, j), grad(0, i+1, j), grad(0, i+1, j+1), grad(0, i, j+1)};
       double v[4] = {grad(1, i, j), grad(1, i+1, j), grad(1, i+1, j+1), grad(1, i, j+1)};
       double mu[2][2];
+      double X[2][2];
 
       int nroots = ftk::inverse_bilinear_interpolation(u, v, mu);
       for (int k = 0; k < nroots; k ++){
         // ftk::bilinear_interpolation3_location(X, mu, x);
-        critical_point_t cp(mu[k], mu[k], 0, 0);
-        critical_points.insert(std::make_pair(j * DW + i, cp));      
+        X[k][0] = i + mu[k][0], X[k][1] = j + mu[k][1]; 
+        critical_point_t cp(mu[k], X[k], 0, 0);
+        cp.simplex_id = id;
+        cp.type = bilinear_critical_point_type(u, v, mu[k]);
+        critical_points.insert(std::make_pair(2*id + k, cp));      
       }
+      // if((fabs(mu[k][0] - 0.400304) < 1e-6) && (fabs(mu[k][1] - 0.505862) < 1e-6)){
+      // if((j==1962) && (i==933)){
+      //   std::cout << j << " " << i << ": number of roots = " << nroots << std::endl;
+      //   for(int i=0; i<nroots; i++){
+      //     std::cout << "root " << i << ": " << mu[i][0] << " " << mu[i][1] << std::endl;
+      //   }
+      //   for(int i=0; i<4; i++){
+      //     std::cout << u[i] << " ";
+      //   }
+      //   std::cout << std::endl;
+      //   for(int i=0; i<4; i++){
+      //     std::cout << v[i] << " ";
+      //   }
+      //   std::cout << std::endl;
+      // }
+
       // for (int k = 0; k < nroots; k ++)
       //   fprintf(stderr, "i=%d, j=%d, x=%f, y=%f\n", i, j, i + mu[k][0], j + mu[k][1]);
+      id ++;
     }
 }
 
@@ -138,22 +204,6 @@ void writefile(const char * file, Type * data, size_t num_elements){
   std::ofstream fout(file, std::ios::binary);
   fout.write(reinterpret_cast<const char*>(&data[0]), num_elements*sizeof(Type));
   fout.close();
-}
-
-void record_criticalpoints(std::string prefix, const std::vector<critical_point_t>& cps){
-  double * positions = (double *) malloc(cps.size()*2*sizeof(double));
-  int * type = (int *) malloc(cps.size()*sizeof(int));
-  int i = 0;
-  for(const auto& cp:cps){
-    positions[2*i] = cp.x[0];
-    positions[2*i+1] = cp.x[1];
-    type[i] = cp.type;
-    i ++;
-  }
-  writefile((prefix + "_pos.dat").c_str(), positions, cps.size()*2);
-  writefile((prefix + "_type.dat").c_str(), type, cps.size());
-  free(positions);
-  free(type);
 }
 
 inline bool file_exists(const std::string& filename) {
@@ -225,5 +275,68 @@ int main(int argc, char **argv){
   cp_file ? printf("Critical point file found!\n") : printf("Critical point Not found, recomputing\n");
   auto critical_points_0 = cp_file ? read_criticalpoints("origin_M") : get_critical_points();
   std::cout << "critical_points number = " << critical_points_0.size() << std::endl;
+
+  {
+    std::cout << "read decompressed data\n";
+    std::string fn_u = std::string(argv[3]) + ".out";
+    std::string fn_v = std::string(argv[4]) + ".out";
+    u = readfile<float>(fn_u.c_str(), num);
+    v = readfile<float>(fn_v.c_str(), num);
+    std::cout << "read " << num << " decompressed data done\n";
+  }
+  refill_gradient(0, u);
+  refill_gradient(1, v);
+  free(u);
+  free(v);
+  std::cout << "refill gradients done\n";
+  auto critical_points_1 = get_critical_points();
+  std::cout << "decompressed critical_points number = " << critical_points_1.size() << std::endl;
+  int matches = 0;
+  std::vector<critical_point_t> fp, fn, ft, m;
+  std::vector<critical_point_t> origin;
+  // int cp_type_change = 0;
+  for(const auto& p:critical_points_0){
+    auto cp = p.second;
+    origin.push_back(cp);
+    if(critical_points_1.find(p.first) != critical_points_1.end()){
+      // matches ++;
+      auto cp_1 = critical_points_1[p.first];
+      if(cp.type != cp_1.type){
+        std::cout << "Change from " << get_critical_point_type_string(cp.type)
+          << " to " << get_critical_point_type_string(cp_1.type) <<
+           ", positions from " << cp.x[0] << ", " << cp.x[1] << " to " << cp_1.x[0] << ", " << cp_1.x[1] << std::endl;
+        // cp_type_change ++;
+        ft.push_back(cp_1);
+      }
+      else m.push_back(cp_1);
+    }
+    else fn.push_back(p.second);
+    // std::cout << std::endl;
+  }
+  for(const auto& p:critical_points_1){
+    if(critical_points_0.find(p.first) == critical_points_0.end()){
+      fp.push_back(p.second);
+    }
+  }
+  std::cout << "FN number = " << fn.size() << std::endl; 
+  for(const auto& cp:fn){
+    // std::cout << "mu = " << cp.mu[0] << ", " << cp.mu[1] << ", " << cp.mu[2] << "; x = " << cp.x[0] << ", " << cp.x[1] << "; v = " << cp.v << std::endl;
+    std::cout << "x = " << cp.x[0] << ", " << cp.x[1] << "; type = " << get_critical_point_type_string(cp.type) << std::endl;
+  }
+  std::cout << "FP number = " << fp.size() << std::endl; 
+  for(const auto& cp:fp){
+    // std::cout << "mu = " << cp.mu[0] << ", " << cp.mu[1] << ", " << cp.mu[2] << "; x = " << cp.x[0] << ", " << cp.x[1] << "; v = " << cp.v << std::endl;
+    std::cout << "x = " << cp.x[0] << ", " << cp.x[1] << "; type = " << get_critical_point_type_string(cp.type) << std::endl;
+  }
+  std::cout << "FT number = " << ft.size() << std::endl; 
+  for(const auto& cp:ft){
+    std::cout << "x = " << cp.x[0] << ", " << cp.x[1] << "; type = " << get_critical_point_type_string(cp.type) << std::endl;
+  }
+  std::cout << "Ground truth = " << origin.size() << std::endl;
+  std::cout << "TP = " << m.size() << std::endl;
+  std::cout << "FP = " << fp.size() << std::endl;
+  std::cout << "FN = " << fn.size() << std::endl;
+  std::cout << "FT = " << ft.size() << std::endl;
+
   return 0;
 }
